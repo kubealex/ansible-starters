@@ -18,16 +18,14 @@
 
     - name: Create ssh key pair for the user
       openssh_keypair:
-        path: ~/.ssh/id_rsa_test
-        #path: ~/.ssh/id_rsa
+        path: ~/.ssh/{{ ssh_key | default('id_rsa') }}
         mode: 0600
         owner: "{{ ansible_user }}"
         group: "{{ ansible_user }}"
 
     - name: Retrieve public key
       ansible.builtin.slurp:
-        path: ~/.ssh/id_rsa_test.pub
-        #path: ~/.ssh/id_rsa.pub
+        path: ~/.ssh/{{ ssh_key | default('id_rsa') }}.pub
       register: public_key
     
     - name: Show content of the key

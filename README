@@ -1,0 +1,5 @@
+## user_ssh_config
+This play is used for setting up an SSH key for the current user to a set of remote hosts. 
+Requires at least a configured user with sudo privileges on remote hosts to run.
+
+The name of the key can be specified with *ssh_key* variable via commandline

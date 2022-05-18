@@ -1,34 +1,55 @@
 ---
 - name: Basic ssh-key setup for a user
-  hosts: all
+  hosts: localhost
   #become: true
   vars:
-    ansible_user: "{{ lookup('env','USER') }}"
+    current_user: "{{ lookup('env','USER') }}"
   tasks:
-    - name: Deploy ssh_config for the user
+
+    - name: Ensure .ssh folder is present for {{ current_user }}
+      file:
+        path: ~/.ssh
+        state: directory
+        mode: 0700
+        owner: "{{ current_user }}"
+        group: "{{ current_user }}"
+
+    - name: Deploy ssh_config for user {{ current_user }}
       ansible.builtin.lineinfile:
         path: ~/.ssh/config
         mode: 0600
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
+        owner: "{{ current_user }}"
+        group: "{{ current_user }}"
         create: true
         regex: "^StrictHostKeyChecking"
         line: "StrictHostKeyChecking no"
         insertbefore: BOF
 
-    - name: Create ssh key pair for the user
+    - name: Create ssh key pair for user {{ current_user }}
       openssh_keypair:
         path: ~/.ssh/{{ ssh_key | default('id_rsa') }}
         mode: 0600
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
+        owner: "{{ current_user }}"
+        group: "{{ current_user }}"
 
-    - name: Retrieve public key
+    - name: Retrieve public key and store it
       ansible.builtin.slurp:
         path: ~/.ssh/{{ ssh_key | default('id_rsa') }}.pub
       register: public_key
-    
-    - name: Show content of the key
-      debug:
-        var: public_key.content | b64decode
+   
+    - name: Ensure {{ service_user | default('ansible') }} is present
+      become: true
+      user: 
+        name: "{{ service_user | default('ansible') }}"
+        create_home: true
+      delegate_to: "{{ item }}"
+      with_items: "{{ groups['remote_hosts'] }}"
 
+    - name: Authorize current user {{ current_user }} key on {{ inventory_hostname }} for {{ service_user | default('ansible') }}
+      become: true
+      ansible.posix.authorized_key:
+        user: "{{ service_user | default('ansible') }}"
+        key: "{{ public_key.content | b64decode }}"
+        state: present
+      delegate_to: "{{ item }}"
+      with_items: "{{ groups['remote_hosts'] }}"

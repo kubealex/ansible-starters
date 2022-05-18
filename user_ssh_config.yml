@@ -1,0 +1,36 @@
+---
+- name: Basic ssh-key setup for a user
+  hosts: all
+  #become: true
+  vars:
+    ansible_user: "{{ lookup('env','USER') }}"
+  tasks:
+    - name: Deploy ssh_config for the user
+      ansible.builtin.lineinfile:
+        path: ~/.ssh/config
+        mode: 0600
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        create: true
+        regex: "^StrictHostKeyChecking"
+        line: "StrictHostKeyChecking no"
+        insertbefore: BOF
+
+    - name: Create ssh key pair for the user
+      openssh_keypair:
+        path: ~/.ssh/id_rsa_test
+        #path: ~/.ssh/id_rsa
+        mode: 0600
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+
+    - name: Retrieve public key
+      ansible.builtin.slurp:
+        path: ~/.ssh/id_rsa_test.pub
+        #path: ~/.ssh/id_rsa.pub
+      register: public_key
+    
+    - name: Show content of the key
+      debug:
+        var: public_key.content | b64decode
+

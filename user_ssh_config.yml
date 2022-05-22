@@ -6,7 +6,7 @@
     current_user: "{{ lookup('env','USER') }}"
   tasks:
 
-    - name: Ensure .ssh folder is present for {{ current_user }}
+    - name: Ensure .ssh folder is present for user {{ current_user }}
       file:
         path: ~/.ssh
         state: directory
@@ -32,12 +32,12 @@
         owner: "{{ current_user }}"
         group: "{{ current_user }}"
 
-    - name: Retrieve public key and store it
+    - name: Retrieve public key for user {{ current_user }}  and store it
       ansible.builtin.slurp:
         path: ~/.ssh/{{ ssh_key | default('id_rsa') }}.pub
       register: public_key
    
-    - name: Ensure {{ service_user | default('ansible') }} is present
+    - name: Ensure service user {{ service_user | default('ansible') }} is present
       become: true
       user: 
         name: "{{ service_user | default('ansible') }}"
@@ -45,11 +45,24 @@
       delegate_to: "{{ item }}"
       with_items: "{{ groups['remote_hosts'] }}"
 
-    - name: Authorize current user {{ current_user }} key on {{ inventory_hostname }} for {{ service_user | default('ansible') }}
+    - name: Authorize current user {{ current_user }} key on {{ inventory_hostname }} for user {{ service_user | default('ansible') }}
       become: true
       ansible.posix.authorized_key:
         user: "{{ service_user | default('ansible') }}"
         key: "{{ public_key.content | b64decode }}"
+        state: present
+      delegate_to: "{{ item }}"
+      with_items: "{{ groups['remote_hosts'] }}"
+
+    - name: Enable sudo access for user {{ service_user | default('ansible') }}
+      become: true
+      lineinfile:
+        path: /etc/sudoers.d/{{ service_user | default('ansible') }}
+        line: "{{ service_user | default('ansible') }}   ALL=(ALL)       NOPASSWD: ALL"
+        mode: 0600
+        owner: root
+        group: root
+        create: true
         state: present
       delegate_to: "{{ item }}"
       with_items: "{{ groups['remote_hosts'] }}"

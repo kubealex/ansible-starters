@@ -1,13 +1,18 @@
 ---
-- name: Basic ssh-key setup for a user
+- name: Basic creation and ssh-key setup for a user
   hosts: localhost
   #become: true
   vars:
     current_user: "{{ lookup('env','USER') }}"
   tasks:
 
+    - name: Ensure {{ current_user }} is present on {{ hostvars[inventory_hostname].ansible_host }}
+      ansible.builtin.user:
+        name: "{{ current_user }}"
+        create_home: true
+
     - name: Ensure .ssh folder is present for user {{ current_user }}
-      file:
+      ansible.builtin.file:
         path: ~/.ssh
         state: directory
         mode: 0700
@@ -56,7 +61,7 @@
 
     - name: Enable sudo access for user {{ service_user | default('ansible') }}
       become: true
-      lineinfile:
+      ansible.builtin.lineinfile:
         path: /etc/sudoers.d/{{ service_user | default('ansible') }}
         line: "{{ service_user | default('ansible') }}   ALL=(ALL)       NOPASSWD: ALL"
         mode: 0600

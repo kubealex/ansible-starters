@@ -1,73 +1,54 @@
 ---
 - name: Basic creation and ssh-key setup for a user
-  hosts: localhost
-  #become: true
+  hosts: remote_hosts
   vars:
-    current_user: "{{ lookup('env','USER') }}"
+    user_name: ""
   tasks:
 
-    - name: Ensure {{ current_user }} is present on {{ hostvars[inventory_hostname].ansible_host }}
-      ansible.builtin.user:
-        name: "{{ current_user }}"
-        create_home: true
+    - name: Set user as fact
+      ansible.builtin.set_fact:
+        user_name: "{{ user_name | default('ansible') }}"
 
-    - name: Ensure .ssh folder is present for user {{ current_user }}
+    - name: Ensure {{ user_name }} is present on {{ inventory_hostname }}
+      ansible.builtin.user:
+        name: "{{ user_name }}"
+        create_home: true
+      become: true
+
+    - name: Ensure .ssh folder is present for user {{ user_name }}
       ansible.builtin.file:
         path: ~/.ssh
         state: directory
         mode: 0700
-        owner: "{{ current_user }}"
-        group: "{{ current_user }}"
+        owner: "{{ user_name }}"
+        group: "{{ user_name }}"
 
-    - name: Deploy ssh_config for user {{ current_user }}
-      ansible.builtin.lineinfile:
-        path: ~/.ssh/config
-        mode: 0600
-        owner: "{{ current_user }}"
-        group: "{{ current_user }}"
-        create: true
-        regex: "^StrictHostKeyChecking"
-        line: "StrictHostKeyChecking no"
-        insertbefore: BOF
-
-    - name: Create ssh key pair for user {{ current_user }}
-      openssh_keypair:
+    - name: Create ssh key pair for user {{ user_name }}
+      community.crypto.openssh_keypair:
         path: ~/.ssh/{{ ssh_key | default('id_rsa') }}
         mode: 0600
-        owner: "{{ current_user }}"
-        group: "{{ current_user }}"
+        owner: "{{ user_name }}"
+        group: "{{ user_name }}"
 
-    - name: Retrieve public key for user {{ current_user }}  and store it
+    - name: Retrieve public key for user {{ user_name }}  and store it
       ansible.builtin.slurp:
-        path: ~/.ssh/{{ ssh_key | default('id_rsa') }}.pub
+        path: ~/.ssh/id_rsa.pub
       register: public_key
-   
-    - name: Ensure service user {{ service_user | default('ansible') }} is present
-      become: true
-      user: 
-        name: "{{ service_user | default('ansible') }}"
-        create_home: true
-      delegate_to: "{{ item }}"
-      with_items: "{{ groups['remote_hosts'] }}"
+      delegate_to: localhost
 
-    - name: Authorize current user {{ current_user }} key on {{ inventory_hostname }} for user {{ service_user | default('ansible') }}
+    - name: Authorize current user key on {{ inventory_hostname }} for user {{ user_name }}
       become: true
       ansible.posix.authorized_key:
-        user: "{{ service_user | default('ansible') }}"
+        user: "{{ user_name }}"
         key: "{{ public_key.content | b64decode }}"
         state: present
-      delegate_to: "{{ item }}"
-      with_items: "{{ groups['remote_hosts'] }}"
 
-    - name: Enable sudo access for user {{ service_user | default('ansible') }}
+    - name: Enable sudo access for user {{ user_name }}
       become: true
       ansible.builtin.lineinfile:
-        path: /etc/sudoers.d/{{ service_user | default('ansible') }}
-        line: "{{ service_user | default('ansible') }}   ALL=(ALL)       NOPASSWD: ALL"
+        path: /etc/sudoers.d/{{ user_name }}
+        line: "{{ user_name }}   ALL=(ALL)       NOPASSWD: ALL"
         mode: 0600
         owner: root
         group: root
         create: true
-        state: present
-      delegate_to: "{{ item }}"
-      with_items: "{{ groups['remote_hosts'] }}"

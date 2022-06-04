@@ -1,5 +1,3 @@
-localhost ansible_connection=local
-
 [remote_hosts]
 centos8-server.rhdemo.labs ansible_user=sysadmin
 rhel8-server.rhdemo.labs ansible_user=sysadmin
